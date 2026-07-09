@@ -1,0 +1,30 @@
+# ==========================================================================
+# Elasticsearch role_mapping.yml (EXAMPLE)
+# ==========================================================================
+# Maps Elasticsearch roles (keys) to one or more Active Directory / LDAP
+# group or user distinguished names (values). Consumed by the native realm /
+# role-mapping API when `es_security_authc_realms_active_directory_my_ad` is
+# enabled.
+#
+# The real mapping used in production/AT lists specific AD user and group DNs
+# and is intentionally NOT included in this public repository, since it
+# reveals internal directory structure and named individuals' access levels.
+# Maintain your real mapping as a private, gitignored file (or pull it from
+# your secrets manager / config management system at deploy time) using the
+# same structure as the example below.
+#
+# Example:
+superuser:
+  - "CN=elastic-admins,OU=Groups,DC=ad,DC=example,DC=com"
+
+kibana_readonly_users:
+  - "CN=kibana-readonly,OU=Groups,DC=ad,DC=example,DC=com"
+
+monitoring_user:
+  - "CN=elastic-monitoring,OU=Groups,DC=ad,DC=example,DC=com"
+
+kibana_service_users:
+  - "CN=svc-jenkins,OU=ServiceAccounts,DC=ad,DC=example,DC=com"
+
+viewer:
+  - "CN=elastic-viewers,OU=Groups,DC=ad,DC=example,DC=com"

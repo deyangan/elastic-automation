@@ -1,0 +1,58 @@
+es_version: 8.19.15
+es_build: 1
+es_majorv: 8
+es_http_port: 9200
+es_upgrade: false
+es_restart: false
+es_cluster_name: elasticlog-at
+es_root_dir: /data/elasticsearch
+es_data_path: "{{ es_root_dir }}/data"
+es_log_path: "{{ es_root_dir }}/elasticsearch-home/logs"
+es_node_name: "{{ inventory_hostname }}"
+es_network_host: "{{ ansible_host }}"
+es_bootstrap_memory_lock: true
+es_health_apikey: "{{ vault_es_health_apikey }}"  # store in Ansible Vault / secrets manager, never in plain group_varses_security_enabled: true
+es_security_enrollment_enabled: true
+es_security_http_ssl_enabled: true
+es_security_http_ssl_keystore_path: "certs/{{ inventory_hostname }}/{{ inventory_hostname }}.p12"
+es_security_http_ssl_truststore_path: "certs/elaapsm-truststore.p12"
+es_security_transport_ssl_enabled: true
+es_security_transport_ssl_keystore_path: "certs/{{ inventory_hostname }}/{{ inventory_hostname }}.p12"
+es_security_transport_ssl_truststore_path: "certs/elaapsm-truststore.p12"
+es_security_transport_ssl_verification_mode: full
+es_security_audit_enabled: true
+es_security_audit_logfile_events_ignore_filters:
+  filter_roles:
+    roles: ["logstash_writer", "kibana_system", "logstash_system"]
+  filter_indices:
+    indices: [".kibana", ".security"]
+es_notification_email_account:
+  work:
+    profile: smtp_relay_profile
+    email_defaults:
+      from: elastic-at@example.com
+    smtp:
+      auth: false
+      host: smtp-relay.ad.example.com
+      port: 25
+es_security_authc_realms_active_directory_my_ad:
+  order: 0
+  domain_name: "ad.example.com"
+  url: "ldaps://ad.example.com:636"
+  user_search:
+    base_dn: "OU=PHA,DC=apb,DC=example-corp,DC=se"
+  group_search:
+    base_dn: "DC=apb,DC=example-corp,DC=se"
+  ssl:
+    certificate_authorities: ["certs/apb_ca.pem"]
+    verification_mode: certificate
+es_path_repo: /ElasticBackup/ATBackup
+es_discovery_seed_hosts: "{{ groups['elasticlog-at_elastic'] | map('extract', hostvars, 'inventory_hostname') | list }}"
+es_master_nodes: "{{ groups['elasticlog-at_elastic_master'] | map('extract', hostvars, 'inventory_hostname') | list }}"
+elastic_package: "elasticsearch-{{ es_version }}-{{ es_build }}"
+es_slm_policy_id: daily-snapshots
+es_baseurl: https://artifacts.elastic.co/packages/{{ es_majorv }}.x/yum
+es_gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+es_kibana_node: es-at-node3.example.com
+es_model_stage: "/ElasticBackup/models"
+

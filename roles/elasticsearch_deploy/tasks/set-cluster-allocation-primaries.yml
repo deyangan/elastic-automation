@@ -1,0 +1,24 @@
+- name: Set cluster routing allocation to primaries
+  uri:
+    url: "https://{{ ansible_host }}:{{ es_http_port }}/_cluster/settings"
+    method: PUT
+    validate_certs: false
+    return_content: true
+    headers:
+      Authorization: "ApiKey {{ es_health_apikey }}"
+      Content-Type: "application/json"
+    body: |
+      {
+        "persistent": {
+          "cluster.routing.allocation.enable": "primaries"
+        }
+      }
+    body_format: json
+    status_code: 200
+  register: cluster_allocation_response
+  when: not ansible_check_mode
+
+- name: Debug - Show cluster allocation update to primaries
+  debug:
+    msg: "Cluster allocation set to primaries: {{ cluster_allocation_response }}"
+  when: not ansible_check_mode

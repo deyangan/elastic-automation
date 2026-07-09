@@ -1,0 +1,13 @@
+# For JVM Options
+es_xms_size: 32g
+es_xmx_size: 32g
+##put the model artifacts into a directory inside the config directory on all master-eligible nodes
+es_ml_el_repository: "file:///etc/elasticsearch/config/models"
+#Node roles
+es_node_roles:
+  - master
+  - data_hot
+  - data_content
+  - ingest
+  - transform
+  - remote_cluster_client

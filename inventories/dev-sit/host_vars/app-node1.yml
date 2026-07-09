@@ -1,0 +1,9 @@
+service_list:
+  - activemq
+  - kisoft-producer-1
+  - kisoft-producer-2
+  - kisoft-consumer-1
+  - kisoft-consumer-2
+  - tip-producer-1
+  - tip-producer-2
+  - heartbeat-producer-1

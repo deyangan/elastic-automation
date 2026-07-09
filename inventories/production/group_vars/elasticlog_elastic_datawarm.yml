@@ -1,0 +1,10 @@
+# For JVM Options
+es_xms_size: 14g
+es_xmx_size: 14g
+es_discovery_seed_hosts: ["prodnode2","prodnode3","prodnode4","prodnode9", "prodnode10"]
+#Node roles
+es_node_roles:
+  - data_warm
+  - ml
+  - transform
+  - remote_cluster_client

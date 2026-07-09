@@ -1,0 +1,58 @@
+# Parent groups
+# Cluster elasticlog all elastic nodes
+[elasticlog_elastic]
+elaprodnode10 ansible_host=es-prod-node10.apl.example.com
+elaprodnode9 ansible_host=es-prod-node9.apl.example.com
+elaprodnode12 ansible_host=es-prod-node12.apl.example.com
+elaprodnode11 ansible_host=es-prod-node11.apl.example.com
+elaprodnode8 ansible_host=es-prod-node8.apl.example.com
+elaprodnode7 ansible_host=es-prod-node7.apl.example.com
+elaprodnode6 ansible_host=es-prod-node6.apl.example.com
+elaprodnode5 ansible_host=es-prod-node5.example.com
+elaprodnode1 ansible_host=es-prod-node1.example.com
+elaprodnode3 ansible_host=es-prod-node3.example.com
+elaprodnode2 ansible_host=es-prod-node2.example.com
+elaprodnode4 ansible_host=es-prod-node4.example.com
+
+# Cluster elasticlog all Kibana nodes
+[elasticlog_kibana]
+elaprodnode4 ansible_host=es-prod-node4.example.com
+elaprodnode2 ansible_host=es-prod-node2.example.com
+elaprodnode3 ansible_host=es-prod-node3.example.com
+elaprodnode1 ansible_host=es-prod-node1.example.com
+
+# Cluster elasticlog all Master nodes
+[elasticlog_elastic_master]
+elaprodnode4 ansible_host=es-prod-node4.example.com
+elaprodnode2 ansible_host=es-prod-node2.example.com
+elaprodnode3 ansible_host=es-prod-node3.example.com
+elaprodnode9 ansible_host=es-prod-node9.apl.example.com
+elaprodnode10 ansible_host=es-prod-node10.apl.example.com
+
+# Cluster elasticlog all Hot nodes
+[elasticlog_elastic_datahot]
+elaprodnode4 ansible_host=es-prod-node4.example.com
+elaprodnode2 ansible_host=es-prod-node2.example.com
+elaprodnode3 ansible_host=es-prod-node3.example.com
+
+# Cluster elasticlog all Warm nodes
+[elasticlog_elastic_datawarm]
+elaprodnode1 ansible_host=es-prod-node1.example.com
+elaprodnode5 ansible_host=es-prod-node5.example.com
+elaprodnode6 ansible_host=es-prod-node6.apl.example.com
+
+# Cluster elasticlog all Cold nodes
+[elasticlog_elastic_datacold]
+elaprodnode7 ansible_host=es-prod-node7.apl.example.com
+elaprodnode8 ansible_host=es-prod-node8.apl.example.com
+
+# Cluster elasticlog all Frozen nodes
+[elasticlog_elastic_datafrozen]
+elaprodnode9 ansible_host=es-prod-node9.apl.example.com
+elaprodnode10 ansible_host=es-prod-node10.apl.example.com
+
+# Cluster elasticlog all Fleet nodes
+[elasticlog_elastic_fleet]
+elaprodnode11 ansible_host=es-prod-node11.apl.example.com
+elaprodnode12 ansible_host=es-prod-node12.apl.example.com
+

@@ -1,0 +1,24 @@
+##########################################################################################
+## Run the Upgrade Assistant, which identifies deprecated settings in your configuration
+## and guides you through resolving issues that could prevent a successful upgrade
+## Before you change configurations or reindex, ensure you have a current snapshot backup
+##
+## Major version upgrades can include breaking changes -- Review the changes before upgrading
+## Before upgrading your production deployment, test the upgrade in lower env
+##
+## It's important that you upgrade your components in this order:
+## Elasticsearch
+## Kibana
+## Elastic APM
+## Ingest components
+##########################################################################################
+
+---
+- name: Deploy Elasticsearch
+  hosts: all
+  gather_facts: true
+  become: true
+  become_user: root
+  serial: 1
+  roles:
+    - elasticsearch_deploy

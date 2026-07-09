@@ -1,0 +1,12 @@
+- name: Start Kibana service
+  ansible.builtin.systemd_service:
+    name: kibana
+    state: started
+  register: kibana_start_result
+
+- name: DEBUG | Kibana service start details
+  ansible.builtin.debug:
+    msg:
+      - "Changed      : {{ kibana_start_result.changed | default(false) }}"
+      - "Failed       : {{ kibana_start_result.failed | default(false) }}"
+      - "State action : start"

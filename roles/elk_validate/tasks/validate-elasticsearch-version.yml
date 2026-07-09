@@ -1,0 +1,20 @@
+- name: Get Elasticsearch node versions
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ es_http_port }}/_cat/nodes?h=ip,name,version&v=true"
+    method: GET
+    validate_certs: false
+    return_content: true
+    headers:
+      Authorization: "ApiKey {{ es_health_apikey }}"
+  register: es_node_versions
+  retries: 10
+  delay: 30
+  until: es_node_versions.status == 200
+  when: not ansible_check_mode
+
+- name: Debug - Display node versions
+  ansible.builtin.debug:
+    msg: |
+      Node version info:
+      {{ es_node_versions.content }}
+  when: not ansible_check_mode

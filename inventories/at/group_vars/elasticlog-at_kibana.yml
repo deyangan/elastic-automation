@@ -1,0 +1,41 @@
+kb_version: 8.19.15
+kb_build: 1
+kb_majorv: 8
+kb_upgrade: false
+kb_restart: false
+kb_cluster_name: elasticlog-at
+kb_lbcert_name: kibana-at.example.com
+kb_root_dir: /data/kibana
+kb_data_path: "{{ kb_root_dir }}/data"
+kb_log_path: "{{ kb_root_dir }}/kibana-home/logs"
+kb_server_port: 5601
+kb_server_host: "{{ inventory_hostname }}.example.com"
+kb_server_name: "{{ inventory_hostname }}"
+kb_security_sessionTimeout: "2h"
+kb_security_sessionlifespan: "1d"
+kb_security_sessioncleanupInterval: "3m"
+kb_server_ssl_enabled: true
+kb_server_ssl_certificate: "/etc/kibana/certs/{{kb_lbcert_name}}.crt"
+kb_server_ssl_key: "/etc/kibana/certs/{{kb_lbcert_name}}.key"
+kb_elasticsearch_username: "kibana_system"
+kb_elasticsearch_elasticlog_at_password: "{{ vault_kibana_es_password }}"
+# Store the ansible-vault encrypted value in a private, gitignored vars file
+# (e.g. group_vars/elasticlog-at_kibana/vault.yml) or pull it from your
+# secrets manager at deploy time -- never commit real vault blobs to a
+# public repository.
+kb_elasticsearch_requestTimeout: 1500
+kb_elasticsearch_ssl_certificateAuthorities: /etc/kibana/certs/elaca.pem
+kb_elasticsearch_ssl_verificationMode: full
+kb_encryptedSavedObjects_elasticlog_at_encryptionKey: "{{ vault_kibana_encryption_key }}"
+# Same guidance as above: keep the real ansible-vault blob out of version
+# control, or at minimum out of a public repository.
+kb_autocompleteTimeout: 100000
+kb_autocompleteTerminateAfter: 10000000
+kb_fleet_registryProxyUrl: http://registry-proxy.example.com:8888
+kb_reporting_queue_timeout: 2m
+kb_fleet_isAirGapped: false
+kibana_package: "kibana-{{ kb_version }}-{{ kb_build }}"
+kb_baseurl: https://artifacts.elastic.co/packages/{{ kb_majorv }}.x/yum
+kb_gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+kb_csp_strict: false
+kb_csp_warnLegacyBrowsers: false

@@ -1,0 +1,16 @@
+- name: Check Upgrade Assistant status
+  ansible.builtin.uri:
+    url: "https://{{ es_kibana_node }}:5601/api/upgrade_assistant/status"
+    method: GET
+    headers:
+      Authorization: "ApiKey {{ es_health_apikey }}"
+    validate_certs: false
+    return_content: true
+  register: readyforupgrade_status
+  run_once: true
+
+- name: Fail if not ready for upgrade
+  ansible.builtin.fail:
+    msg: "Cluster is not ready for upgrade: {{ readyforupgrade_status.json.details }}"
+  when: not readyforupgrade_status.json.readyForUpgrade
+  run_once: true

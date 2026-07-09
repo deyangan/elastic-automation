@@ -1,0 +1,24 @@
+- name: Reset cluster routing allocation (clear override)
+  uri:
+    url: "https://{{ ansible_host }}:{{ es_http_port }}/_cluster/settings"
+    method: PUT
+    validate_certs: false
+    return_content: true
+    headers:
+      Authorization: "ApiKey {{ es_health_apikey }}"
+      Content-Type: "application/json"
+    body: |
+      {
+        "persistent": {
+          "cluster.routing.allocation.enable": null
+        }
+      }
+    body_format: json
+    status_code: 200
+  register: cluster_allocation_reset_response
+  when: not ansible_check_mode
+
+- name: Debug - Show cluster allocation reset response
+  debug:
+    msg: "Cluster allocation reset: {{ cluster_allocation_reset_response }}"
+  when: not ansible_check_mode

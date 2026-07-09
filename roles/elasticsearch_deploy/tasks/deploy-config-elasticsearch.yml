@@ -1,0 +1,283 @@
+- name: Verify /etc/elasticsearch exists
+  ansible.builtin.stat:
+    path: /etc/elasticsearch/
+  register: elasticsearch_dir
+
+- name: Fail if /etc/elasticsearch is missing
+  ansible.builtin.fail:
+    msg: "/etc/elasticsearch missing – service installation incomplete"
+  when: not elasticsearch_dir.stat.exists
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Allow elasticsearch group to write to /etc/elasticsearch
+  ansible.builtin.file:
+    path: /etc/elasticsearch
+    mode: "g+w"
+    recurse: true
+  when: elasticsearch_dir.stat.exists
+
+- name: Ensure certs directory exists
+  ansible.builtin.file:
+    path: "/etc/elasticsearch/certs"
+    state: directory
+    owner: root
+    group: elasticsearch
+    mode: "0770"
+  register: certs_dir_creation
+
+- name: Debug - Certs directory status
+  ansible.builtin.debug:
+    msg: "Created certs directory: {{ certs_dir_creation.changed }}"
+
+- name: Ensure model directory exists
+  ansible.builtin.file:
+    path: "/etc/elasticsearch/config/models"
+    state: directory
+    owner: root
+    group: elasticsearch
+    mode: "0776"
+  register: model_dir_creation
+  when: es_ml_el_repository is defined
+
+- name: Debug - Model directory status
+  ansible.builtin.debug:
+    msg: "Created models directory: {{ model_dir_creation.changed }}"
+  when: es_ml_el_repository is defined
+
+- name: Ensure directory exists certs/{{ inventory_hostname }}
+  ansible.builtin.file:
+    path: "/etc/elasticsearch/certs/{{ inventory_hostname }}"
+    state: directory
+    owner: root
+    group: elasticsearch
+    mode: "0770"
+  register: host_certs_dir_creation
+
+- name: Debug - Host-specific certs directory status
+  ansible.builtin.debug:
+    msg: "Created {{ inventory_hostname }} subdirectory: {{ host_certs_dir_creation.changed }}"
+
+- name: Generate elasticsearch.yml from template
+  ansible.builtin.template:
+    src: elasticsearch-v{{ es_majorv }}.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    owner: root
+    group: elasticsearch
+    mode: "0660"
+    backup: true
+  register: template_result
+  notify: Restart Elasticsearch service
+
+- name: Debug - Template status
+  ansible.builtin.debug:
+    msg: "Generated elasticsearch.yml: {{ template_result.changed }}"
+
+- name: Copy Keystore
+  ansible.builtin.copy:
+    src: "files/{{ es_cluster_name }}/certs/{{ inventory_hostname }}.p12"
+    dest: "/etc/elasticsearch/certs/{{ inventory_hostname }}/{{ inventory_hostname }}.p12"
+    owner: root
+    group: elasticsearch
+    mode: "0775"
+  register: cert_copy
+
+- name: Debug - Certificates copy status
+  ansible.builtin.debug:
+    msg: "Copied Keystore: {{ cert_copy.changed }}"
+
+- name: Copy Elastic keystore
+  ansible.builtin.copy:
+    src: "files/{{ es_cluster_name }}/certs/elasticsearch.keystore"
+    dest: "/etc/elasticsearch/"
+    owner: elasticsearch
+    group: elasticsearch
+    mode: "0660"
+  register: keystore_copy
+  notify: Restart Elasticsearch service
+
+- name: Debug - Keystore copy status
+  ansible.builtin.debug:
+    msg: "Copied elasticsearch.keystore: {{ keystore_copy.changed }}"
+
+- name: Copy Elastic Truststore
+  ansible.builtin.copy:
+    src: "files/{{ es_cluster_name }}/certs/elaapsm-truststore.p12"
+    dest: "/etc/elasticsearch/certs/"
+    owner: elasticsearch
+    group: elasticsearch
+    mode: "0770"
+  register: truststore_copy
+  notify: Restart Elasticsearch service
+
+- name: Debug - truststore copy status
+  ansible.builtin.debug:
+    msg: "Copied elaapsm-truststore.p12: {{ truststore_copy.changed }}"
+
+- name: Copy APB CA for LDAPS
+  ansible.builtin.copy:
+    src: "files/{{ es_cluster_name }}/certs/apb_ca.pem"
+    dest: "/etc/elasticsearch/certs/"
+    owner: root
+    group: elasticsearch
+    mode: "0660"
+  register: apbca_copy
+  notify: Restart Elasticsearch service
+  when: es_security_authc_realms_active_directory_my_ad is defined
+
+- name: Debug - Copy APB CA status
+  ansible.builtin.debug:
+    msg: "Copied apb_ca.pem: {{ apbca_copy.changed }}"
+  when: es_security_authc_realms_active_directory_my_ad is defined
+
+- name: Copy Elastic roles
+  ansible.builtin.copy:
+    src: "files/{{ es_cluster_name }}/roles/role_mapping.yml"
+    dest: "/etc/elasticsearch/"
+    owner: root
+    group: elasticsearch
+    mode: "0660"
+  register: roles_copy
+  notify: Restart Elasticsearch service
+
+- name: Debug - Roles copy status
+  ansible.builtin.debug:
+    msg: "Copied role_mapping.yml: {{ roles_copy.changed }}"
+
+- name: Configure Elasticsearch JVM options
+  ansible.builtin.template:
+    src: jvm.options-v{{ es_majorv }}.yml.j2
+    dest: /etc/elasticsearch/jvm.options
+    owner: root
+    group: elasticsearch
+    mode: "0640"
+  register: jvm_copy
+  notify: Restart Elasticsearch service
+
+- name: Debug - JVM options copy status
+  ansible.builtin.debug:
+    msg: "Copied jvm.options: {{ jvm_copy.changed }}"
+
+- name: Copy models to elastic
+  ansible.builtin.copy:
+    src: "{{ es_model_stage }}/"
+    dest: "/etc/elasticsearch/config/models"
+    owner: root
+    group: elasticsearch
+    mode: "0776"
+    remote_src: true
+  register: models_copy
+  when: es_ml_el_repository is defined
+
+- name: Debug - Copy of Models to elastic
+  ansible.builtin.debug:
+    msg: "Copied Models: {{ models_copy.changed }}"
+
+- name: Copy override.conf
+  ansible.builtin.copy:
+    src: "files/override.conf"
+    dest: "/etc/systemd/system/elasticsearch.service.d/"
+    owner: root
+    group: root
+    mode: "0755"
+  register: override_copy
+  notify: Restart Elasticsearch service
+
+- name: Debug - step Copy override.conf
+  ansible.builtin.debug:
+    msg: "Copied jvm.options: {{ override_copy.changed }}"
+
+- name: Reload systemd daemon to apply changes
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  register: reload_status
+
+- name: Check daemon reload
+  ansible.builtin.debug:
+    msg: "systemd reloaded : {{ reload_status.changed }}"
+
+# Precompute once: used by the Kibana stop/start logic and the flush_handlers
+# trigger below. Also avoids repeating (and re-lint-flagging) the same
+# 160+ character OR expression three times.
+- name: Set fact for whether Elasticsearch configuration changed
+  ansible.builtin.set_fact:
+    es_config_changed: >-
+      {{ es_restart | bool or es_upgrade | bool or template_result.changed or
+         cert_copy.changed or keystore_copy.changed or apbca_copy.changed or
+         roles_copy.changed or jvm_copy.changed or models_copy.changed or
+         override_copy.changed or upgrade_result.changed or truststore_copy.changed }}
+
+- name: Check if Kibana service exists on this node (skip if already known from an earlier play)
+  include_role:
+    name: elk_validate
+    tasks_from: kibana-service-exists
+  when: kibana_svc_check is not defined
+
+- name: Stop Kibana before Elasticsearch restart (skip if the upgrade play already stopped it)
+  include_role:
+    name: elk_validate
+    tasks_from: stop-kibana
+  when:
+    - not (kibana_stopped_by_play | default(false))
+    - kibana_svc_check.rc is defined
+    - kibana_svc_check.rc == 0
+    - es_config_changed | bool
+
+- name: Set fact that Kibana was stopped by this play (standalone config-deployment run)
+  ansible.builtin.set_fact:
+    kibana_stopped_by_play: true
+  when:
+    - not (kibana_stopped_by_play | default(false))
+    - kibana_svc_check.rc is defined
+    - kibana_svc_check.rc == 0
+    - es_config_changed | bool
+
+- name: DEBUG | Kibana stopped ahead of Elasticsearch restart
+  ansible.builtin.debug:
+    msg: "Kibana stopped locally by the config-deployment play (no prior upgrade play ran on this node)"
+  when: kibana_stopped_by_play | default(false)
+
+- name: Force notify restart handler if es_restart or es_upgrade is set true
+  ansible.builtin.set_fact:
+    es_force_restart: true
+  when: es_restart | bool or es_upgrade | bool
+  notify: Restart Elasticsearch service
+  changed_when: true
+
+- name: Flush handlers to restart Elasticsearch now
+  ansible.builtin.meta: flush_handlers
+  when: es_config_changed | bool
+
+- name: Verify Elastic version of the node
+  include_role:
+    name: elk_validate
+    tasks_from: validate-elasticsearch-version
+
+- name: Reset cluster allocation back to default
+  include_role:
+    name: elasticsearch_deploy
+    tasks_from: reset-cluster-allocation-primaries
+
+- name: Verify cluster health status before starting Kibana
+  include_role:
+    name: elk_validate
+    tasks_from: validate-elasticsearch-health-yellow
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Start Kibana Service (only if it was stopped by the Elasticsearch upgrade play)
+  include_role:
+    name: elk_validate
+    tasks_from: start-kibana
+  when:
+    - kibana_stopped_by_play | default(false)
+
+- name: DEBUG | Kibana service started after Elasticsearch restart
+  ansible.builtin.debug:
+    msg: "Kibana service start task executed after the Elasticsearch cluster health check reached yellow"
+  when:
+    - kibana_stopped_by_play | default(false)
+
+- name: DEBUG | Kibana start skipped
+  ansible.builtin.debug:
+    msg: "Kibana was not stopped by the Elasticsearch upgrade play (service not present on this node, or upgrade did not run) — skipping start"
+  when:
+    - not (kibana_stopped_by_play | default(false))

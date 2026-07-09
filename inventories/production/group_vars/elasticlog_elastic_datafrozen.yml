@@ -1,0 +1,11 @@
+# For JVM Options
+es_xms_size: 4g
+es_xmx_size: 4g
+#For Frozen Cache data
+es_searchable_snapshot_shared_cache_size: 1500GB
+##put the model artifacts into a directory inside the config directory on all master-eligible nodes
+es_ml_el_repository: "file:///etc/elasticsearch/config/models"
+#Node roles
+es_node_roles:
+  - master
+  - data_frozen

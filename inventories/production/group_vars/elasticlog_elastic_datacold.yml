@@ -1,0 +1,7 @@
+# For JVM Options
+es_xms_size: 8g
+es_xmx_size: 8g
+es_discovery_seed_hosts: ["node1","node2","node3","node4"]
+#Node roles
+es_node_roles:
+  - data_cold

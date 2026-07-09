@@ -1,0 +1,22 @@
+# Secrets & certificates - never commit these
+*.p12
+*.pem
+*.crt
+*.key
+*.keystore
+*.jks
+vault_pass*
+.vault-password
+**/vault.yml
+*.retry
+
+# Ansible / local runtime
+*.log
+.ansible/
+*.pyc
+__pycache__/
+
+# Editor/OS cruft
+.DS_Store
+.idea/
+*.swp

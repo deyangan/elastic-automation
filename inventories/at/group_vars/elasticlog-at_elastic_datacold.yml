@@ -1,0 +1,5 @@
+es_xms_size: 10g
+es_xmx_size: 10g
+es_node_roles:
+  - data_cold
+  - data_frozen

@@ -1,0 +1,21 @@
+---
+- name: Get last successful snapshot info from SLM policy
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ es_http_port }}/_slm/policy/{{ es_slm_policy_id }}"
+    method: GET
+    validate_certs: false
+    return_content: true
+    headers:
+      Authorization: "ApiKey {{ es_health_apikey }}"
+  register: es_slm_policy
+  when: not ansible_check_mode
+
+- name: Set last successful snapshot time (epoch ms)
+  ansible.builtin.set_fact:
+    last_snapshot_time: "{{ es_slm_policy.json[es_slm_policy_id].last_success.time }}"
+  when: not ansible_check_mode
+
+- name: Calculate current time in epoch ms
+  ansible.builtin.set_fact:
+    current_time_ms: "{{ (ansible_date_time.epoch | int) * 1000 }}"
+  when: not ansible_check_mode

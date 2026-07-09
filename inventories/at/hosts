@@ -1,0 +1,44 @@
+#Elastic AT Parent groups
+[elasticlog-at:children]
+elasticlog-at_elastic
+elasticlog-at_kibana
+
+# Cluster elasticlog-at elastic nodes
+[elasticlog-at_elastic]
+elaatnode4 ansible_host=es-at-node4.apl.example.com
+elaatnode5 ansible_host=es-at-node5.apl.example.com
+elaatnode1 ansible_host=es-at-node1.example.com
+elaatnode2 ansible_host=es-at-node2.example.com
+elaatnode3 ansible_host=es-at-node3.example.com
+
+# Cluster elasticlog-at all Master nodes
+[elasticlog-at_elastic_master]
+elaatnode1 ansible_host=es-at-node1.example.com
+elaatnode2 ansible_host=es-at-node2.example.com
+elaatnode3 ansible_host=es-at-node3.example.com
+
+# Cluster elasticlog-at all Hot nodes
+[elasticlog-at_elastic_datahot]
+elaatnode1 ansible_host=es-at-node1.example.com
+elaatnode2 ansible_host=es-at-node2.example.com
+elaatnode3 ansible_host=es-at-node3.example.com
+
+# Cluster elasticlog-at all Warm nodes
+[elasticlog-at_elastic_datawarm]
+elaatnode1 ansible_host=es-at-node1.example.com
+elaatnode2 ansible_host=es-at-node2.example.com
+elaatnode3 ansible_host=es-at-node3.example.com
+
+# Cluster elasticlog-at all Cold nodes
+[elasticlog-at_elastic_datacold]
+elaatnode4 ansible_host=es-at-node4.apl.example.com
+elaatnode5 ansible_host=es-at-node5.apl.example.com
+
+# Cluster elasticlog-at all Frozen nodes
+[elasticlog-at_elastic_datafrozen]
+elaatnode4 ansible_host=es-at-node4.apl.example.com
+elaatnode5 ansible_host=es-at-node5.apl.example.com
+
+# Cluster elasticlog-at all Fleet nodes
+[elasticlog-at_elastic_fleet]
+elaatnode1 ansible_host=es-at-node1.example.com

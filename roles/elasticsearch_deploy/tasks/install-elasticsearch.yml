@@ -1,0 +1,350 @@
+---
+- name: Elasticsearch install/upgrade with always cleanup
+  block:
+
+    - name: Import Elasticsearch GPG Key
+      ansible.builtin.rpm_key:
+        state: present
+        key: "{{ es_gpgkey }}"
+      ignore_errors: true
+
+    - name: DEBUG | GPG key import attempted
+      ansible.builtin.debug:
+        msg: "Elasticsearch GPG key import attempted for {{ es_gpgkey }}"
+
+    - name: Configure repository
+      ansible.builtin.yum_repository:
+        name: elasticsearch
+        description: "Elasticsearch repository for {{ es_majorv }}.x packages"
+        baseurl: "{{ es_baseurl }}"
+        gpgcheck: true
+        gpgkey: "{{ es_gpgkey }}"
+        enabled: true
+
+    - name: DEBUG | Repo configured
+      ansible.builtin.debug:
+        msg: "Elasticsearch yum repository configured and enabled for version {{ es_majorv }}.x"
+
+    # NOTE: kept as raw `command` (not package_facts) intentionally.
+    # elasticsearch_installed.rc / es_installed_version.stdout / es_post_upgrade_version.stdout
+    # are consumed directly by this file, install-kibana.yml, kibana-service-exists.yml,
+    # and the config-deployment tasks file. Switching modules would break every consumer.
+    - name: Check Elasticsearch installation status
+      ansible.builtin.command: rpm -q elasticsearch  # noqa: command-instead-of-module
+      check_mode: false
+      register: elasticsearch_installed
+      ignore_errors: true
+
+    - name: DEBUG | Elasticsearch installation status
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Elasticsearch is installed: ' + elasticsearch_installed.stdout
+             if elasticsearch_installed.rc == 0
+             else 'Elasticsearch is NOT installed on this host' }}
+
+    - name: Get installed Elasticsearch version
+      ansible.builtin.command: rpm -q --qf "%{VERSION}" elasticsearch  # noqa: command-instead-of-module
+      register: es_installed_version
+      check_mode: false
+      when: elasticsearch_installed.rc == 0
+
+    - name: DEBUG | Installed Elasticsearch version
+      ansible.builtin.debug:
+        msg: "Installed Elasticsearch version is {{ es_installed_version.stdout | default('not installed') }}"
+
+    - name: DEBUG | Full variable state before action
+      ansible.builtin.debug:
+        msg:
+          - "es_version (target)    = {{ es_version }}"
+          - "elastic_package        = {{ elastic_package }}"
+          - "es_upgrade             = {{ es_upgrade | default('NOT SET') }}"
+          - >-
+            installed_version =
+            {{ es_installed_version.stdout | default('NOT INSTALLED') }}
+          - >-
+            upgrade needed =
+            {{ es_version is version(es_installed_version.stdout | default('0.0.0'), '>') }}
+          - >-
+            downgrade attempted =
+            {{ es_version is version(es_installed_version.stdout | default('0.0.0'), '<') }}
+
+    - name: Fail if downgrade is attempted
+      ansible.builtin.fail:
+        msg: "Downgrade not allowed: target {{ es_version }} < installed {{ es_installed_version.stdout }}"
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_installed_version.stdout is defined
+        - es_installed_version.stdout | length > 0
+        - es_version is version(es_installed_version.stdout, '<')
+
+    - name: Install Elasticsearch
+      ansible.builtin.package:
+        name: "{{ elastic_package }}"
+        state: present
+      register: install_result
+      when:
+        - elasticsearch_installed.rc != 0
+
+    - name: DEBUG | Install result
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Elasticsearch ' + es_version + ' was freshly installed'
+             if install_result.changed | default(false)
+             else 'Install task skipped (Elasticsearch already installed)' }}
+      when: elasticsearch_installed.rc != 0
+
+    - name: Verify elastic cluster health status - executes only during upgrade
+      include_role:
+        name: elk_validate
+        tasks_from: validate-elasticsearch-health
+      when: es_upgrade | bool
+      tags:
+        - skip_step
+
+    - name: Fail if elasticsearch is not healthy - executes only during upgrade
+      ansible.builtin.fail:
+        msg: "Elastic {{ es_cluster_name }} cluster status is : {{ es_cluster_health }} , Please check the cluster health, fix any issues and restart"
+      when:
+        - es_cluster_health.json.status != "green"
+        - es_upgrade | bool
+      ignore_errors: "{{ ansible_check_mode }}"
+      tags:
+        - skip_step
+
+    - name: DEBUG | Cluster health check passed
+      ansible.builtin.debug:
+        msg: "Cluster {{ es_cluster_name }} health is green — safe to proceed with upgrade"
+      when: es_upgrade | bool
+      tags:
+        - skip_step
+
+    - name: Verify last elastic backup - executes only during upgrade
+      include_role:
+        name: elk_validate
+        tasks_from: validate-elasticsearch-bkp
+      when: es_upgrade | bool
+      tags:
+        - skip_step
+
+    - name: Fail if last successful snapshot is older than 1 day - executes only during upgrade
+      ansible.builtin.fail:
+        msg: "Last successful snapshot is older than 1 day!"
+      when:
+        - (current_time_ms | int) - (last_snapshot_time | int) > (24 * 60 * 60 * 1000)
+        - es_upgrade | bool
+      ignore_errors: "{{ ansible_check_mode | bool }}"
+      tags:
+        - skip_step
+
+    - name: DEBUG | Snapshot check passed
+      ansible.builtin.debug:
+        msg: "Last snapshot is recent — safe to proceed with upgrade"
+      when: es_upgrade | bool
+      tags:
+        - skip_step
+
+    - name: Verify Upgrade readiness - executes only during upgrade
+      include_role:
+        name: elk_validate
+        tasks_from: validate-ready-for-upgrade
+      when: es_upgrade | bool
+      tags:
+        - skip_step
+
+    - name: DEBUG | Upgrade readiness check passed
+      ansible.builtin.debug:
+        msg: "Upgrade readiness validated — proceeding with Elasticsearch upgrade"
+      when: es_upgrade | bool
+      tags:
+        - skip_step
+
+    - name: DEBUG | Upgrade condition check
+      ansible.builtin.debug:
+        msg:
+          - "Installed version : {{ es_installed_version.stdout | default('none') }}"
+          - "Target version    : {{ es_version }}"
+          - "Upgrade flag      : {{ es_upgrade | bool }}"
+          - >-
+            Version compare =
+            {{ es_version }} > {{ es_installed_version.stdout | default('0.0.0') }} =
+            {{ es_version is version(es_installed_version.stdout | default('0.0.0'), '>') }}
+          - >-
+            Will upgrade =
+            {{ elasticsearch_installed.rc == 0 and es_upgrade | bool and
+               es_version is version(es_installed_version.stdout | default('0.0.0'), '>') }}
+      when: elasticsearch_installed.rc == 0
+
+    - name: Check if Kibana service exists on this node
+      include_role:
+        name: elk_validate
+        tasks_from: kibana-service-exists
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_upgrade | bool
+        - es_version is version(es_installed_version.stdout, '>')
+
+    - name: Stop Kibana Service Before Upgrade
+      include_role:
+        name: elk_validate
+        tasks_from: stop-kibana
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_upgrade | bool
+        - es_version is version(es_installed_version.stdout, '>')
+        - kibana_svc_check.rc is defined
+        - kibana_svc_check.rc == 0
+
+    - name: Set fact that Kibana was stopped by this play
+      ansible.builtin.set_fact:
+        kibana_stopped_by_play: true
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_upgrade | bool
+        - es_version is version(es_installed_version.stdout, '>')
+        - kibana_svc_check.rc is defined
+        - kibana_svc_check.rc == 0
+
+    - name: DEBUG | Kibana service stop
+      ansible.builtin.debug:
+        msg: "Kibana service stopped before Elasticsearch upgrade"
+      when: kibana_stopped_by_play | default(false)
+
+    - name: DEBUG | Kibana not present on this node
+      ansible.builtin.debug:
+        msg: "Kibana package/service not found on this node — skipping Kibana stop/start"
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_upgrade | bool
+        - es_version is version(es_installed_version.stdout, '>')
+        - kibana_svc_check.rc is defined
+        - kibana_svc_check.rc != 0
+
+    - name: Stop Elasticsearch Service Before Upgrade
+      ansible.builtin.systemd_service:
+        name: elasticsearch
+        state: stopped
+      register: stopped_result
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_upgrade | bool
+        - es_version is version(es_installed_version.stdout, '>')
+
+    - name: DEBUG | Elasticsearch service stop result
+      ansible.builtin.debug:
+        msg: "{{ 'Elasticsearch service stopped successfully before upgrade' if stopped_result.changed | default(false) else 'Elasticsearch service was already stopped' }}"
+      when: es_upgrade | bool
+
+    - name: Upgrade Elasticsearch
+      ansible.builtin.dnf:
+        name: "elasticsearch-{{ es_version }}"
+        state: present
+      register: upgrade_result
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_upgrade | bool
+        - es_version is version(es_installed_version.stdout, '>')
+
+    - name: DEBUG | Upgrade result
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Elasticsearch successfully upgraded from ' + es_installed_version.stdout + ' to ' + es_version
+             if upgrade_result.changed | default(false)
+             else 'Upgrade task ran but no changes made — may already be at ' + es_version }}
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_upgrade | bool
+
+    - name: Verify Elasticsearch version after upgrade
+      ansible.builtin.command: rpm -q --qf "%{VERSION}" elasticsearch  # noqa: command-instead-of-module
+      register: es_post_upgrade_version
+      changed_when: false
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_upgrade | bool
+
+    - name: DEBUG | Post-upgrade version confirmation
+      ansible.builtin.debug:
+        msg:
+          - "Version before : {{ es_installed_version.stdout | default('unknown') }}"
+          - "Version after  : {{ es_post_upgrade_version.stdout | default('unknown') }}"
+          - "Target version : {{ es_version }}"
+          - "Upgrade OK     : {{ es_post_upgrade_version.stdout | default('') == es_version }}"
+      when:
+        - elasticsearch_installed.rc == 0
+        - es_upgrade | bool
+
+    - name: Reload systemd daemon to apply changes
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      register: reload_status
+
+    - name: DEBUG | Systemd daemon reloaded
+      ansible.builtin.debug:
+        msg: "Systemd daemon reloaded successfully"
+
+    - name: Enable Elasticsearch service
+      ansible.builtin.systemd_service:
+        name: elasticsearch
+        enabled: true
+      register: elastic_enabled
+      ignore_errors: "{{ ansible_check_mode }}"
+
+    - name: DEBUG | Elasticsearch service enabled at boot
+      ansible.builtin.debug:
+        msg: "{{ 'Elasticsearch service enabled at boot' if elastic_enabled.changed | default(false) else 'Elasticsearch service was already enabled at boot' }}"
+
+  rescue:
+
+    - name: Set fact that the upgrade block failed or aborted
+      ansible.builtin.set_fact:
+        kibana_needs_start: true
+
+    - name: DEBUG | Upgrade block failed - Kibana will be restarted in always
+      ansible.builtin.debug:
+        msg: "Elasticsearch upgrade task/play failed or aborted — Kibana will be started back up in the always block"
+
+    - name: Re-raise the original failure so the play still reports failed
+      ansible.builtin.fail:
+        msg: "Elasticsearch install/upgrade failed: {{ ansible_failed_result.msg | default('see task output above for details') }}"
+
+  always:
+
+    - name: Start Kibana Service (only if the upgrade failed/aborted - post-upgrade start is handled by the configuration deployment play)
+      include_role:
+        name: elk_validate
+        tasks_from: start-kibana
+      when:
+        - kibana_stopped_by_play | default(false)
+        - kibana_needs_start | default(false)
+
+    - name: DEBUG | Kibana service restarted after failure
+      ansible.builtin.debug:
+        msg: "Kibana service start task executed in always block — Elasticsearch upgrade failed/aborted, restoring Kibana"
+      when:
+        - kibana_stopped_by_play | default(false)
+        - kibana_needs_start | default(false)
+
+    - name: DEBUG | Kibana left stopped for post-upgrade config deployment play
+      ansible.builtin.debug:
+        msg: "Elasticsearch upgrade completed successfully — Kibana remains stopped; the configuration deployment play is responsible for starting it"
+      when:
+        - kibana_stopped_by_play | default(false)
+        - not (kibana_needs_start | default(false))
+
+    - name: Disable yum repository post-install
+      ansible.builtin.yum_repository:
+        name: elasticsearch
+        description: "Elasticsearch repository for {{ es_majorv }}.x packages"
+        baseurl: "{{ es_baseurl }}"
+        gpgcheck: true
+        gpgkey: "{{ es_gpgkey }}"
+        enabled: false
+
+    - name: Remove yum repository post-install
+      ansible.builtin.file:
+        path: /etc/yum.repos.d/elasticsearch.repo
+        state: absent
+
+    - name: DEBUG | Repo cleanup complete
+      ansible.builtin.debug:
+        msg: "Elasticsearch yum repository disabled and repo file removed — yum update is safe"

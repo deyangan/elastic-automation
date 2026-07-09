@@ -1,0 +1,18 @@
+- name: Verify Kibana Node Health Status
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ kb_server_port }}"
+    method: GET
+    validate_certs: false
+    return_content: true
+    status_code: 200
+  register: kb_cluster_health
+  retries: 8
+  delay: 45
+  until: >
+    kb_cluster_health.status == 200
+  when: not ansible_check_mode
+
+- name: Debug - Display Kibana Node status
+  ansible.builtin.debug:
+    msg: "Kibana {{ ansible_host }} node status is : {{ kb_cluster_health.status }}"
+  when: not ansible_check_mode

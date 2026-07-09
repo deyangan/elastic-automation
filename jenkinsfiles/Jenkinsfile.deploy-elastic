@@ -1,0 +1,171 @@
+// ============================================================================
+// Elasticsearch Ansible Deployment Pipeline
+//
+// Ansible code lives in this Git repository. This job is
+// configured as "Pipeline script from SCM", so Jenkins checks out the repo
+// (and this Jenkinsfile) automatically before any stage runs — there is no
+// separate checkout stage needed here.
+//
+// Two supported workflows:
+//   Deploy/redeploy:
+//     ENV=at|production, LIMIT=<host or group>, UPGRADE=false
+//   Upgrade:
+//     ENV=production, LIMIT=<host or group>, UPGRADE=true, ES_VERSION=8.16.5,
+//     RESTART=true, SKIP_TAGS=skip_step (optional, skips upgrade-readiness checks)
+// ============================================================================
+pipeline {
+    agent { label 'ansible-ctrl01 || ansible-ctrl02' }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        ansiColor('xterm')
+    }
+
+    parameters {
+        choice(name: 'ENV', choices: ['at', 'production'], description: 'Target environment')
+        string(name: 'ANSIBLE_USER', defaultValue: 'your-ad-account@ad.example.com', description: 'SSH user for Ansible - use YOUR AD account')
+        password(name: 'ANSIBLE_PASSWORD', defaultValue: '', description: 'SSH login password for ANSIBLE_USER (masked in logs)')
+        password(name: 'BECOME_PASSWORD', defaultValue: '', description: 'Sudo/become password. Leave blank to reuse ANSIBLE_PASSWORD (masked in logs)')
+        string(name: 'LIMIT', defaultValue: 'apsm-node1', description: 'Required in practice: --limit pattern (host or group), e.g. elaprodnode10')
+        booleanParam(name: 'UPGRADE', defaultValue: false, description: 'Run an Elasticsearch version upgrade instead of a plain deploy')
+        string(name: 'ES_VERSION', defaultValue: '', description: 'Required only when UPGRADE=true, e.g. 8.16.5')
+        booleanParam(name: 'RESTART', defaultValue: false, description: 'Force Elasticsearch service restart (only meaningful with UPGRADE=true)')
+        string(name: 'SKIP_TAGS', defaultValue: '', description: 'Optional --skip-tags, e.g. skip_step to bypass upgrade-readiness checks')
+        booleanParam(name: 'DRY_RUN', defaultValue: true, description: 'Check mode (--check --diff). Uncheck box until you are ready to apply for real.')
+    }
+
+    environment {
+        ANSIBLE_HOST_KEY_CHECKING = 'False'
+        ANSIBLE_FORCE_COLOR = 'true'
+        PY_COLORS = '1'
+    }
+
+    stages {
+
+        stage('Validate Input Parameters') {
+            steps {
+                script {
+                    if (params.UPGRADE && !params.ES_VERSION?.trim()) {
+                        error("ES_VERSION is required when UPGRADE=true")
+                    }
+                    if (!params.LIMIT?.trim()) {
+                        error("LIMIT is required - specify a target host or inventory group")
+                    }
+                    if (!params.ANSIBLE_PASSWORD) {
+                        error("ANSIBLE_PASSWORD is required")
+                    }
+                    if (params.ENV == 'production' && params.DRY_RUN == false) {
+                        echo "⚠️  Running LIVE (non-check) against PRODUCTION. Make sure this is intentional."
+                    }
+                }
+            }
+        }
+
+        stage('Build Command for Deployment') {
+            steps {
+                script {
+                    // Builds the ansible-playbook invocation shown in the console log.
+                    // No credentials are ever part of this string - passwords are
+                    // injected separately at execution time via a vars file.
+                    def cmdParts = [
+                        'ansible-playbook',
+                        "-i inventories/${params.ENV}/hosts",
+                        'playbooks/deploy-elastic.yml',
+                        "-u ${params.ANSIBLE_USER}",
+                        '--become',
+                        "--limit ${params.LIMIT}"
+                    ]
+
+                    if (params.UPGRADE) {
+                        cmdParts << "-e \"es_version=${params.ES_VERSION} es_upgrade=true es_restart=${params.RESTART}\""
+                    }
+
+                    if (params.SKIP_TAGS?.trim()) {
+                        cmdParts << "--skip-tags ${params.SKIP_TAGS}"
+                    }
+
+                    if (params.DRY_RUN) {
+                        cmdParts << '--check --diff'
+                    }
+
+                    env.ANSIBLE_CMD = cmdParts.join(' ')
+
+                    echo "📦 Command to be executed (credentials passed separately, never shown):\n${env.ANSIBLE_CMD} --extra-vars @<redacted-vars-file>"
+                }
+            }
+        }
+
+        stage('Elastic Deployment') {
+            steps {
+                // set +x is critical here: it stops the shell from tracing the
+                // password-handling lines below to the console log. Without it,
+                // Jenkins' own command echoing will print plaintext passwords
+                // (this happened in a prior run - see EFFECTIVE_BECOME_PASS in
+                // build #<n> console output).
+                sh '''
+                    set -e
+                    set +x
+
+                    umask 077
+                    VARS_FILE=$(mktemp)
+                    trap 'rm -f "${VARS_FILE}"' EXIT
+
+                    EFFECTIVE_BECOME_PASS="${BECOME_PASSWORD:-$ANSIBLE_PASSWORD}"
+
+                    cat > "${VARS_FILE}" <<VARSEOF
+ansible_password: "${ANSIBLE_PASSWORD}"
+ansible_become_pass: "${EFFECTIVE_BECOME_PASS}"
+VARSEOF
+
+                    echo "▶️  Running: ${ANSIBLE_CMD} --extra-vars @${VARS_FILE}"
+
+                    eval "${ANSIBLE_CMD} --extra-vars @${VARS_FILE}"
+                '''
+            }
+        }
+
+        stage('Verify') {
+            when {
+                expression { return !params.DRY_RUN }
+            }
+            steps {
+                sh '''
+                    set -e
+                    set +x
+
+                    umask 077
+                    VARS_FILE=$(mktemp)
+                    trap 'rm -f "${VARS_FILE}"' EXIT
+
+                    EFFECTIVE_BECOME_PASS="${BECOME_PASSWORD:-$ANSIBLE_PASSWORD}"
+
+                    cat > "${VARS_FILE}" <<VARSEOF
+ansible_password: "${ANSIBLE_PASSWORD}"
+ansible_become_pass: "${EFFECTIVE_BECOME_PASS}"
+VARSEOF
+
+                    echo "▶️  Verifying service status on: ${LIMIT}"
+
+                    ansible -i inventories/${ENV}/hosts "${LIMIT}" \
+                        -u ${ANSIBLE_USER} --become \
+                        --extra-vars @${VARS_FILE} \
+                        -m shell -a 'systemctl status elasticsearch | head -n 5'
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Deployment successful (env=${params.ENV}, limit=${params.LIMIT}, dry_run=${params.DRY_RUN}, upgrade=${params.UPGRADE})"
+        }
+        failure {
+            echo "❌ Deployment failed - check console output above"
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

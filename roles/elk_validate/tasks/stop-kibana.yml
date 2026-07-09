@@ -1,0 +1,12 @@
+- name: Stop Kibana service
+  ansible.builtin.systemd_service:
+    name: kibana
+    state: stopped
+  register: kibana_stop_result
+
+- name: DEBUG | Kibana service stop details
+  ansible.builtin.debug:
+    msg:
+      - "Changed      : {{ kibana_stop_result.changed | default(false) }}"
+      - "Failed       : {{ kibana_stop_result.failed | default(false) }}"
+      - "State action : stop"

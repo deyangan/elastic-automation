@@ -1,0 +1,5 @@
+ipadd: "10.0.0.20"
+web_node: "Y"
+cp_node: "Y"
+mwa_node: "Y"
+db_context: "EBSSTP22"

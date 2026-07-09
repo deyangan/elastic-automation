@@ -1,0 +1,8 @@
+# For JVM Options
+es_xms_size: 2g
+es_xmx_size: 2g
+#Node roles
+es_node_roles:
+  - ml
+  - transform
+  - remote_cluster_client

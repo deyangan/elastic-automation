@@ -1,0 +1,106 @@
+# ======================== Elasticsearch Configuration =============================
+#
+# NOTE: Elasticsearch comes with reasonable defaults for most settings.
+#       Before you set out to tweak and tune the configuration, make sure you
+#       understand what you are trying to accomplish and the consequences.
+#
+# ************************************************************************************ 
+#       This Configuration file is deployed automatically from Example Corp code repository
+#       Do not change manually in this file on the server as it might get replaced 
+#       during the next code push.
+#**************************************************************************************
+# Please consult the documentation for further information on configuration options:
+# https://www.elastic.co/guide/en/elasticsearch/reference/index.html
+#
+
+# ---------------------------------- Cluster -----------------------------------
+cluster.name: {{ es_cluster_name }}
+
+# ------------------------------------ Node ------------------------------------
+node.name: {{ es_node_name }}
+node.roles: {{ es_node_roles | to_yaml }}
+
+# ----------------------------------- Paths ------------------------------------
+path.data: {{ es_data_path }}
+path.logs: {{ es_log_path }}
+
+# ----------------------------------- Memory -----------------------------------
+bootstrap.memory_lock: {{ es_bootstrap_memory_lock }}
+
+# ---------------------------------- Network -----------------------------------
+network.host: {{ es_network_host }}
+http.port: {{ es_http_port }}
+
+# --------------------------------- Discovery ----------------------------------
+discovery.seed_hosts: {{ es_discovery_seed_hosts | to_json }}
+
+# Bootstrap the cluster using an initial set of master-eligible nodes:
+#Below setting is not needed when defining node.roles
+#cluster.initial_master_nodes: {{ es_master_nodes | to_json }}
+
+# ---------------------------------- Security ----------------------------------
+xpack.security.enabled: {{ es_security_enabled }}
+xpack.security.enrollment.enabled: {{ es_security_enrollment_enabled }}
+xpack.security.http.ssl.enabled: {{ es_security_http_ssl_enabled }}
+xpack.security.http.ssl.keystore.path: {{ es_security_http_ssl_keystore_path }}
+{% if es_security_http_ssl_truststore_path is defined and es_security_http_ssl_truststore_path %}
+xpack.security.http.ssl.truststore.path: {{ es_security_http_ssl_truststore_path }}
+{% endif %}
+xpack.security.transport.ssl.enabled: {{ es_security_transport_ssl_enabled }}
+xpack.security.transport.ssl.keystore.path: {{ es_security_transport_ssl_keystore_path }}
+{% if es_security_transport_ssl_truststore_path is defined and  es_security_transport_ssl_truststore_path %}
+xpack.security.transport.ssl.truststore.path: {{ es_security_transport_ssl_truststore_path }}
+{% endif %}
+xpack.security.transport.ssl.verification_mode: {{ es_security_transport_ssl_verification_mode }}
+xpack.security.audit.enabled: {{ es_security_audit_enabled }}
+{% if es_security_audit_logfile_events_ignore_filters is defined and es_security_audit_logfile_events_ignore_filters %}
+xpack.security.audit.logfile.events.ignore_filters:
+  filter_roles:
+    roles: {{ es_security_audit_logfile_events_ignore_filters.filter_roles.roles | to_json }}
+  filter_indices:
+    indices: {{ es_security_audit_logfile_events_ignore_filters.filter_indices.indices | to_json }}
+{% endif %}
+
+{% if es_notification_email_account is defined and es_notification_email_account %}
+xpack.notification.email.account:
+{% for account, config in es_notification_email_account.items() %}
+  {{ account }}:
+    profile: {{ config.profile }}
+    email_defaults:
+      from: {{ config.email_defaults.from | to_json }}
+    smtp:
+      auth: {{ config.smtp.auth | lower }}
+      host: {{ config.smtp.host | to_json }}
+      port: {{ config.smtp.port }}
+{% endfor %}
+{% endif %}
+
+{% if es_security_authc_realms_active_directory_my_ad is defined and es_security_authc_realms_active_directory_my_ad %}
+xpack.security.authc.realms.active_directory.my_ad:
+  order: {{ es_security_authc_realms_active_directory_my_ad.order }}
+  domain_name: "{{ es_security_authc_realms_active_directory_my_ad.domain_name }}"
+  url: "{{ es_security_authc_realms_active_directory_my_ad.url }}"
+  user_search:
+    base_dn: "{{ es_security_authc_realms_active_directory_my_ad.user_search.base_dn }}"
+  group_search:
+    base_dn: "{{ es_security_authc_realms_active_directory_my_ad.group_search.base_dn }}"
+  ssl:
+    certificate_authorities: {{ es_security_authc_realms_active_directory_my_ad.ssl.certificate_authorities }}
+    verification_mode: {{ es_security_authc_realms_active_directory_my_ad.ssl.verification_mode }}
+{% endif %}
+
+#Elastic REPO For Backup Backup
+{% if es_path_repo is string %}
+path.repo: [{{ es_path_repo | to_json }}]
+{% else %}
+path.repo: {{ es_path_repo | to_json }}
+{% endif %}
+
+{% if es_ml_el_repository  is defined and es_ml_el_repository %}
+xpack.ml.model_repository: "{{ es_ml_el_repository }}" 
+{% endif %}
+
+{% if es_searchable_snapshot_shared_cache_size  is defined and es_searchable_snapshot_shared_cache_size %}
+xpack.searchable.snapshot.shared_cache.size: "{{ es_searchable_snapshot_shared_cache_size }}" 
+{% endif %}
+

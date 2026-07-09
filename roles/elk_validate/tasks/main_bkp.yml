@@ -1,0 +1,5 @@
+---
+- name: Validate-elasticsearch-health
+  import_tasks: validate-elasticsearch-health.yml
+- name: Validate-elasticsearch-backup
+  import_tasks: validate-elasticsearch-bkp.yml

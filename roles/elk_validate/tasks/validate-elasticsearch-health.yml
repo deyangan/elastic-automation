@@ -1,0 +1,19 @@
+- name: Verify Elastic Cluster Health Status
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ es_http_port }}/_cluster/health"
+    method: GET
+    validate_certs: false
+    return_content: true
+    headers:
+      Authorization: "ApiKey {{ es_health_apikey }}"
+  register: es_cluster_health
+  retries: 40
+  delay: 30
+  until: >
+    es_cluster_health.json.status == "green"
+  when: not ansible_check_mode
+
+- name: Debug - Display Cluster status
+  ansible.builtin.debug:
+    msg: "Elastic {{ es_cluster_name }} cluster status is : {{ es_cluster_health }}"
+  when: not ansible_check_mode

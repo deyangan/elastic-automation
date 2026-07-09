@@ -1,0 +1,5 @@
+---
+- name: Install-update-elasticsearch
+  import_tasks: install-elasticsearch.yml
+- name: Deploy-config-elasticsearch
+  import_tasks: deploy-config-elasticsearch.yml

@@ -1,0 +1,39 @@
+pipeline {
+    agent {
+        // Use a label that has python and ansible-lint installed
+        label 'ansible-ctrl01 || ansible-ctrl02' 
+    }
+    // This activates the plugin for the entire pipeline execution
+    options {
+        ansiColor('xterm')
+    }
+    environment {
+        // Ensure Python output isn't buffered in Jenkins logs
+        PYTHONUNBUFFERED = '1'
+    }
+
+    stages {
+        stage('Ansible Lint') {
+            steps {
+                echo "Running lint on branch: ${env.SOURCE_BRANCH}"
+                // Explicitly targeting folders since auto-detection struggles with the layout
+                // --nocolor keeps Jenkins console logs clean and readable
+                ansiColor('xterm') {
+                    sh 'git status && export PY_COLORS=1 && ansible-lint playbooks/ roles/'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs() // Clean workspace after the run completes
+        }
+        success {
+            echo 'Ansible Lint passed successfully!'
+        }
+        failure {
+            echo 'Ansible Lint failed. Please fix formatting or syntax errors before merging.'
+        }
+    }
+}

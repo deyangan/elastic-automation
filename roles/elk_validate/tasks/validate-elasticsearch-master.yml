@@ -1,0 +1,19 @@
+- name: Verify elastic master node
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ es_http_port }}/_cat/master"
+    method: GET
+    validate_certs: false
+    return_content: true
+    headers:
+      Authorization: "ApiKey {{ es_health_apikey }}"
+  register: es_master_node_details
+
+- name: Register master node name
+  ansible.builtin.set_fact:
+    master_node_name: "{{ es_master_node_details.content.split()[-1] }}"
+  when: not ansible_check_mode
+
+- name: Debug - Display master node status
+  ansible.builtin.debug:
+    msg: "Elastic master node is: {{ master_node_name }}"
+  when: not ansible_check_mode

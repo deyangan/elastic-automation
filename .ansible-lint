@@ -1,0 +1,24 @@
+---
+# .ansible-lint
+offline: true
+
+exclude_paths:
+  - .venv/
+  - .git/
+  - playbooks/legacy/
+  - roles/third_party/
+
+warn_list:
+  - experimental
+  - Idiom
+  - yaml
+  - var-naming
+  - name
+  - command-instead-of-shell
+
+mock_modules:
+  - custom_internal_module
+mock_roles:
+  - internal-base-role
+
+profile: shared

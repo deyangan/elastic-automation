@@ -1,0 +1,13 @@
+es_xms_size: 8g
+es_xmx_size: 8g
+##put the model artifacts into a directory inside the config directory on all master-eligible nodes
+es_ml_el_repository: "file:///etc/elasticsearch/config/models"
+es_node_roles:
+  - master
+  - transform
+  - remote_cluster_client
+  - ingest
+  - ml
+  - data_hot
+  - data_content
+  - data_warm
