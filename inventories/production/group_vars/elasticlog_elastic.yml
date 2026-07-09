@@ -48,7 +48,6 @@ es_security_authc_realms_active_directory_my_ad:
     certificate_authorities: ["certs/ad_domain_ca.pem"]
     verification_mode: certificate
 es_path_repo:
-  - /ELKbackup_new/prodbackup
   - /ELKbackup/prodbackup
   - /elastic_frozen/datafrozen
 es_discovery_seed_hosts: ["elaprodnode2","elaprodnode3","elaprodnode4"]
