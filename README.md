@@ -7,9 +7,6 @@ Elasticsearch + Kibana cluster, orchestrated through Jenkins.
 - 📖 **[DEPLOYMENT.md](DEPLOYMENT.md)** — full write-up of the architecture,
   the Jenkins pipeline, what the Ansible role does step by step, and how to
   run it (with diagrams).
-- 🔒 **[SECURITY.md](SECURITY.md)** — what was sanitized from the internal
-  version of this repo, and what you must do before/after publishing your
-  own copy.
 
 ## Quick start
 
