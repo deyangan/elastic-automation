@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Elasticsearch Ansible Ops
 
 Ansible automation to install, configure, and upgrade an on-prem
@@ -45,3 +46,6 @@ jenkinsfiles/                  # CI lint job + the deployment pipeline
   environment's `group_vars`)
 - Real certificates and secrets are **not** included — see
   [SECURITY.md](SECURITY.md) for what you need to supply.
+=======
+# elastic-automation
+>>>>>>> 88a28ec23c6a6abf43a87dfd824df7c3cf4491ec
