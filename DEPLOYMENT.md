@@ -61,70 +61,37 @@ Elasticsearch recommends for log/observability clusters.
 
 ## 3. End-to-end flow
 
-```mermaid
-flowchart LR
-    subgraph Dev["👤 Engineer"]
-        A[Edit playbook / role / inventory]
-    end
-
-    subgraph Git["📦 Git Repository (this repo)"]
-        B[Pull Request]
-        C[main branch]
-    end
-
-    subgraph CI["🔍 CI (ansible-lint)"]
-        D[Jenkinsfile.ansible-lint]
-    end
-
-    subgraph Jenkins["⚙️ Jenkins — Jenkinsfile.deploy-elastic"]
-        E[Build parameters form]
-        F[Validate Input Parameters]
-        G[Build ansible-playbook command]
-        H[Run Elastic Deployment stage]
-        I[Verify stage]
-    end
-
-    subgraph Ctrl["🖥️ Ansible control node"]
-        J[ansible-playbook<br/>playbooks/deploy-elastic.yml]
-    end
-
-    subgraph Cluster["🗄️ Target Elasticsearch / Kibana nodes"]
-        K[(AT cluster)]
-        L[(Production cluster)]
-    end
-
-    A --> B --> D
-    D -- lint pass --> C
-    C -.checked out by.-> Jenkins
-    E --> F --> G --> H --> J
-    H --> I
-    J -- ENV=at --> K
-    J -- ENV=production --> L
-    I -.systemctl status.-> K
-    I -.systemctl status.-> L
-```
+![Elasticsearch deployment pipeline: developer pushes code to the Git repository, Jenkins CI runs ansible-lint on every pull request, Jenkins CD runs the Ansible deploy pipeline, Ansible deploys/upgrades the Elasticsearch and Kibana cluster, and cluster health feeds back to the developer](docs/deployment-architecture.svg)
 
 **In words:**
 
-1. An engineer changes a role, template, or inventory value and opens a pull
-   request.
-2. `Jenkinsfile.ansible-lint` runs `ansible-lint` against `playbooks/` and
-   `roles/` automatically — this is the repo's only automatic trigger, and it
-   only lints, it never touches real infrastructure.
-3. Once merged, nothing happens by itself. A human opens the
-   **`Jenkinsfile.deploy-elastic`** job in Jenkins and fills in the build
-   parameters (see §4).
+1. An engineer changes a role, template, or inventory value on a branch and
+   opens a **pull request** against this repository.
+2. **Every pull request automatically triggers `Jenkinsfile.ansible-lint`**
+   — this is a Jenkins CI job, separate from the deploy pipeline, that runs
+   `ansible-lint` against `playbooks/` and `roles/`. It's the repo's only
+   fully automatic trigger, it never touches real infrastructure, and a PR
+   should not be merged if it fails.
+3. Once the lint check passes and the PR is merged, **nothing deploys by
+   itself.** A human opens the separate **`Jenkinsfile.deploy-elastic`** job
+   in Jenkins and fills in the build parameters (see §4).
 4. Jenkins checks out this repo (it's configured as *"Pipeline script from
    SCM"*), validates the parameters, assembles the exact
    `ansible-playbook` command, and runs it on a labeled Ansible controller
-   agent.
+   agent — this is the same Jenkins server, just a different job/pipeline
+   than the CI lint check.
 5. Ansible connects over SSH to the hosts matching `--limit` in the chosen
    environment's inventory (`inventories/at/hosts` or
    `inventories/production/hosts`) and runs the `elasticsearch_deploy` role
    against them, one host at a time (`serial: 1`).
 6. If `DRY_RUN` is unchecked, a `Verify` stage SSHes back in and prints
    `systemctl status elasticsearch` for a quick sanity check in the Jenkins
-   console output.
+   console output — this is the "Feedback & Monitor" step in the diagram
+   above.
+
+> The diagram is generated from `docs/generate_diagram.py` (matplotlib) —
+> edit that script and re-run it to update `docs/deployment-architecture.svg`
+> if the pipeline changes.
 
 ---
 

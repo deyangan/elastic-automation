@@ -45,7 +45,7 @@ es_security_authc_realms_active_directory_my_ad:
   group_search:
     base_dn: "DC=apb,DC=example-corp,DC=se"
   ssl:
-    certificate_authorities: ["certs/apb_ca.pem"]
+    certificate_authorities: ["certs/ad_domain_ca.pem"]
     verification_mode: certificate
 es_path_repo:
   - /ELKbackup_new/prodbackup
