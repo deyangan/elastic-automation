@@ -61,7 +61,6 @@ Elasticsearch recommends for log/observability clusters.
 
 ## 3. End-to-end flow
 
-![Elasticsearch deployment pipeline: developer pushes code to the Git repository, Jenkins CI runs ansible-lint on every pull request, Jenkins CD runs the Ansible deploy pipeline, Ansible deploys/upgrades the Elasticsearch and Kibana cluster, and cluster health feeds back to the developer](docs/deployment-architecture.svg)
 
 **In words:**
 
@@ -89,9 +88,6 @@ Elasticsearch recommends for log/observability clusters.
    console output — this is the "Feedback & Monitor" step in the diagram
    above.
 
-> The diagram is generated from `docs/generate_diagram.py` (matplotlib) —
-> edit that script and re-run it to update `docs/deployment-architecture.svg`
-> if the pipeline changes.
 
 ---
 
